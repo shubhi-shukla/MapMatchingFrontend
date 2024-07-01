@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Display Coordinates with Leaflet</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- <link rel="stylesheet" href="style.css" /> -->
+    <style>
+      /* Add custom styles here if needed */
+        .maps-container {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-around;
+        }
+
+        #map {
+            height: 800px;
+            width: 90%;
+            margin: 0 auto;
+            border: 20px solid black;
+        }
+
+        .leaflet-container {
+            background-color: #f8f8f8; /* Set background color for the map */
+        }
+
+        .button-container {
+            width: 100%;
+            text-align: center;
+            margin-top: 20px;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-evenly;
+        }
+
+        .fetch-button,
+        .clear-button {
+            padding: 10px 20px;
+            background-color: #007bff; /* Blue color for the button */
+            color: #fff; /* White text color */
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        .fetch-button:hover,
+        .clear-button:hover {
+            background-color: #0056b3; /* Darker blue color on hover */
+        }
+        #actionSelect {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+
+        #actionSelect:hover {
+            border-color: #888;
+        }
+
+        #selectMap {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+
+        #selectMap:hover {
+            border-color: #888;
+        }
+
+        #distanceContainer{
+            text-align: center; 
+            margin-bottom: 20px; 
+            font-size: 30px;
+            font-weight: bold; 
+            color: red;
+        }
+    </style>
+  </head>
+
+  <body class="leaflet-container">
+    <div id="distanceContainer"></div>
+    <section class="maps-container">
+      <div id="map"></div>
+    </section>
+
+    <div class="button-container">
+      <button class="fetch-button" onclick="fetchCoordinates()">
+        Fetch Coordinates
+      </button>
+      <button class="clear-button" onclick="clearData()">Clear Data</button>
+
+      
+        <select id="actionSelect">
+            <option value="mapMatching">Map Matching</option>
+            <option value="shortestDistance">Shortest Distance</option>
+        </select>
+
+        <select id="selectMap">
+            <option value="BLR MYS Highway">Bengaluru Mysore Highway</option>
+            <option value="Spice Garden">Spice Garden</option>
+        </select>
+    
+    </div>
+
+    <!-- Add the dropdown menu -->
+    
+
+    <!-- <div class="dropdown-container">
+        <
+    </div> -->
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+      let addedLayers = [];
+      let lastDisplayedLine = null; // Variable to store the last displayed line
+      var map = L.map("map").setView([0, 0], 2);
+
+      //Add a tile layer to the maps
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(map);
+
+      // Function to fetch coordinates
+      function fetchAndDisplayGeoJSON(value) {
+        console.log("working...abc");
+        fetch(value)
+          .then((response) => response.json())
+          .then((geojson) => {
+            console.log(geojson);
+
+            const lineStyle = {
+              color: "#333533", // Black color
+              weight: 4, // Thickness of the line
+            };
+
+            // Create a GeoJSON layer with custom style and add it to the map
+            L.geoJSON(geojson, {
+              style: lineStyle, // Apply the custom style to all features
+            }).addTo(map);
+
+            var geojsonBounds = L.geoJSON(geojson).getBounds();
+            map.fitBounds(geojsonBounds);
+          })
+          .catch((error) => console.error("Error fetching GeoJSON:", error));
+      }
+
+      fetchAndDisplayGeoJSON("http://127.0.0.1:8080/map_matching_data/useful.geojson");
+
+      let selectedMap = "BLR MYS Highway";
+      
+
+      document.getElementById("selectMap").addEventListener("change", function () {
+        selectedMap = this.value;
+        console.log(selectedMap);
+
+        if(selectedMap == "BLR MYS Highway"){
+            fetchAndDisplayGeoJSON("http://127.0.0.1:8080/map_matching_data/useful.geojson");
+        }
+        else{
+            fetchAndDisplayGeoJSON("http://127.0.0.1:8080/map_matching_data/spice_garden.geojson");
+        }
+      });
+
+      function createCustomMarker(color) {
+        const markerHtmlStyles = `
+        background-color: ${color};
+        width: 1rem;
+        height: 1rem;
+        display: block;
+        left: -1.5rem;
+        top: -1.5rem;
+        position: relative;
+        border-radius: 3rem 3rem 0;
+        transform: rotate(45deg);
+        border: 2px solid #432818`;
+
+        return L.divIcon({
+          className: "custom-pin",
+          iconAnchor: [-10, -10], // Center the icon on the clicked location
+          popupAnchor: [-10, -10], // Offset for the popup if you have one
+          html: `<span style="${markerHtmlStyles}" />`,
+        });
+      }
+
+      // Variable to store the selected action
+      let selectedAction = "mapMatching";
+
+      // Event listener for the dropdown menu
+      console.log(selectedAction);
+      document.getElementById("actionSelect").addEventListener("change", function () {
+        selectedAction = this.value;
+        console.log(selectedAction);
+      });
+
+      // Event listener for map click
+      map.on("click", function (e) {
+        console.log(selectedAction);
+        if (selectedAction === "mapMatching") {
+          handleMapMatchingClick(e);
+        } else if (selectedAction === "shortestDistance") {
+          handleShortestDistanceClick(e);
+        }
+      });
+
+      function handleMapMatchingClick(e) {
+        var latlng = e.latlng;
+        const marker = L.marker(latlng, {
+          icon: createCustomMarker("#432818"),
+        }).addTo(map);
+
+        addedLayers.push(marker);
+        fetchCoordinates(latlng, marker);
+      }
+
+      function handleShortestDistanceClick(e) {
+        var latlng = e.latlng;
+        // Add your custom logic for the shortest distance here
+        console.log("Shortest Distance Clicked at:", latlng);
+        // Example: Adding a marker with a different color
+        const marker = L.marker(latlng, {
+          icon: createCustomMarker("#432818"),
+        }).addTo(map);
+
+        addedLayers.push(marker);
+        findShortestDistance(latlng, marker);
+        // Implement your shortest distance logic here
+      }
+
+      let i = 1;
+
+      function fetchCoordinates(latlng, marker) {
+        console.log("Fetching coordinates...1234");
+        console.log(latlng.lat);
+        console.log(latlng.lng);
+        console.log(i++);
+
+        const data = [latlng.lng, latlng.lat, marker._leaflet_id];
+
+        const options = {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        };
+
+        fetch("http://localhost:8585/processCoordinates", options)
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Network response was not ok");
+            }
+            console.log(response);
+
+            if (response.status === 204) {
+              console.log("Empty response from backend");
+              return null;
+            }
+            return response.json();
+          })
+          .then((data) => {
+            if (data !== null) {
+              console.log("Response from backend:", data);
+              displayPoints(data);
+            }
+          })
+          .catch((error) => {
+            console.error("Error sending POST request:", error);
+          });
+      }
+
+      function findShortestDistance(latlng, marker) {
+        //console.log("Fetching coordinates...1234");
+        console.log(latlng.lat);
+        console.log(latlng.lng);
+        console.log(i++);
+
+        const data = [latlng.lng, latlng.lat, marker._leaflet_id];
+
+        const options = {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        };
+
+        fetch("http://localhost:8585/findShortestDistance", options)
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Network response was not ok");
+            }
+            console.log(response);
+
+            if (response.status === 204) {
+              console.log("Empty response from backend");
+              return null;
+            }
+            return response.json();
+          })
+          .then((data) => {
+            if (data !== null) {
+              console.log("Response from backend:", data);
+              displayPoints(data);
+            }
+          })
+          .catch((error) => {
+            console.error("Error sending POST request:", error);
+          });
+      }
+
+      function displayPoints(points) {
+        // Remove the last displayed line if it exists
+        if (lastDisplayedLine) {
+          map.removeLayer(lastDisplayedLine);
+        }
+
+        const latLngs = points.map((point) => [
+          point.latitude,
+          point.longitude,
+        ]);
+
+        if(latLngs.length >= 1 && selectedAction == "shortestDistance"){
+            const distancePoint = latLngs[latLngs.length - 1];
+            latLngs.pop(); // Remove the last point
+            console.log(distancePoint);
+            const distanceText = `The distance between source to destination is ${distancePoint[1]} km`;
+            document.getElementById("distanceContainer").innerText = distanceText;
+        }
+
+        const lineStyle = {
+          color: "#4361ee",
+          weight: 10,
+        };
+        lastDisplayedLine = L.polyline(latLngs, lineStyle).addTo(map);
+      }
+
+      function displayAlerts(point) {
+        // Remove the last displayed line if it exists
+        // if (lastDisplayedLine) {
+        //   map.removeLayer(lastDisplayedLine);
+        // }
+
+        const latLngs = [point.latitude, point.longitude];
+
+        const marker = L.marker(latLngs, {
+          icon: createCustomMarker("#ff0000"),
+        }).addTo(map);
+        addedLayers.push(marker);
+      }
+
+      function clearData() {
+        const data = { data: "clear" };
+
+        const options = {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        };
+
+        fetch("http://localhost:8585/clearData", options)
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Network response was not ok");
+            }
+            return response.json();
+          })
+          .then((data) => {
+            console.log("Response from backend:", data);
+            clearMarkersAndLines();
+            clearText();
+          })
+          .catch((error) => {
+            console.error("Error sending POST request:", error);
+          });
+      }
+
+      document
+        .querySelector(".clear-button")
+        .addEventListener("click", function () {
+          clearData();
+        });
+
+      function clearMarkersAndLines() {
+        addedLayers.forEach((layer) => map.removeLayer(layer));
+        addedLayers = [];
+        if (lastDisplayedLine) {
+          map.removeLayer(lastDisplayedLine);
+          lastDisplayedLine = null;
+        }
+      }
+
+      function clearText(){
+        document.getElementById("distanceContainer").innerText = "";  
+      }
+
+      map.on("contextmenu", function (e) {
+        handleRightClick(e);
+      });
+
+
+      function handleRightClick(e) {
+        var latlng = e.latlng;
+        const data = [latlng.lng, latlng.lat];
+
+        const options = {
+                method: "POST",
+                headers: {
+                "Content-Type": "application/json",
+                },
+                body: JSON.stringify(data),
+            };
+
+            fetch("http://localhost:8585/raiseAlertRoute", options)
+                .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Network response was not ok");
+                }
+                return response.json();
+                })
+                .then((data) => {
+                console.log("Response from backend:", data);
+                // Handle the response data as needed
+                    displayAlerts(data)
+                    var newlatlng = e.latlng;
+                    newlatlng.lng = 0.00;
+                    newlatlng.lat = 0.00;
+                    findShortestDistance(newlatlng, -1);
+                })
+                .catch((error) => {
+                console.error("Error sending POST request:", error);
+                });
+        }
+    </script>
+  </body>
+</html>
+
+<!-- const marker = L.marker(latlng, {
+    icon: createCustomMarker("#432818"),
+  }).addTo(map); -->
